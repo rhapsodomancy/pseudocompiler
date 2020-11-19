@@ -1,8 +1,9 @@
 use parser::Parse;
-
 mod js_codegen;
 mod lexer;
 mod parser;
+mod solver;
+
 fn main() -> std::io::Result<()> {
     let string = std::fs::read_to_string("main.pl")?;
     let tokens = lexer::lex(string).unwrap();

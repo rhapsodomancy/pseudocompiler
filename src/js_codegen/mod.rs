@@ -195,7 +195,9 @@ impl OutputBuffer for Expression {
 }
 
 pub fn codegen(input: Statements) -> String {
-    let mut buffer = Buffer {output_string: "".to_string()};
+    let mut buffer = Buffer {
+        output_string: "".to_string(),
+    };
     Statements::output(&input, &mut buffer);
     buffer.output_string
 }

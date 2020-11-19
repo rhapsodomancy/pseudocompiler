@@ -1,5 +1,8 @@
 use crate::lexer::{Keyword, Loc, Operator, Punctuation, Span, SpannedToken, Token};
 use thiserror::Error as ThisError;
+use arbitrary::Arbitrary;
+
+use std::fmt::{Display, Formatter};
 
 pub struct ParseCursor {
     input: Vec<SpannedToken>,
@@ -52,6 +55,7 @@ pub trait Parse: Sized {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, ParseError>;
 }
 
+#[derive(Arbitrary, Debug)]
 pub struct Statements(pub Vec<Statement>);
 
 impl Parse for Statements {
@@ -62,8 +66,30 @@ impl Parse for Statements {
     }
 }
 
+impl Display for Statements {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for statement in &self.0 {
+            statement.fmt(f);
+            f.write_str("\n");
+        }
+        Ok(())
+    }
+}
+
+#[derive(Arbitrary, Debug)]
 pub enum Statement {
     ForStatement(ForStatement),
+}
+
+impl Display for Statement {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::ForStatement(statement) => {
+                statement.fmt(f)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Parse for Statement {
@@ -79,8 +105,19 @@ impl Parse for Statement {
     }
 }
 
+#[derive(Arbitrary, Debug)]
 pub struct Block {
     pub statements: Vec<Statement>,
+    pub indentation: u32,
+}
+
+impl Display for Block {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        for statement in &self.statements {
+            statement.fmt(f)?;
+        }
+        Ok(())
+    }
 }
 
 impl Parse for Block {
@@ -110,27 +147,54 @@ impl Parse for Block {
                 break;
             }
         }
-        Ok(Self { statements })
+        Ok(Self {
+            statements,
+            indentation,
+        })
     }
 }
 
-pub struct SpannedItem<T> {
+#[derive(Arbitrary, Debug)]
+pub struct SpannedItem<T> where T: Arbitrary {
     pub item: T,
     pub span: Span,
 }
 
-impl<T> SpannedItem<T> {
+impl<T> SpannedItem<T> where T: Arbitrary {
     fn new(item: T, span: Span) -> Self {
         Self { item, span }
     }
 }
 
+impl<T> Display for SpannedItem<T>
+where
+    T: Display + Arbitrary,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.item.fmt(f)
+    }
+}
+
+#[derive(Arbitrary, Debug)]
 pub struct FunctionDefinition {
     pub keyword_function: SpannedItem<Keyword>,
     pub function_name: Ident,
     pub arguments: Vec<Ident>,
     pub block: Block,
     pub keyword_endfunction: SpannedItem<Keyword>,
+}
+
+impl Display for FunctionDefinition {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("fuhction ")?;
+        self.function_name.fmt(f)?;
+        f.write_str("(")?;
+        for argument in &self.arguments {
+            argument.fmt(f);
+        }
+        f.write_str(")")?;
+        Ok(())
+    }
 }
 
 impl Parse for FunctionDefinition {
@@ -170,12 +234,27 @@ impl Parse for FunctionDefinition {
     }
 }
 
+#[derive(Arbitrary, Debug)]
 pub struct WhileStatement {
     pub keyword_while: SpannedItem<Keyword>,
     pub condition: Expression,
     pub keyword_do: SpannedItem<Keyword>,
     pub block: Block,
     pub keyword_endwhile: SpannedItem<Keyword>,
+}
+
+impl Display for WhileStatement {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("while ")?;
+        self.condition.fmt(f)?;
+        f.write_str(" do")?;
+        f.write_str("\n")?;
+        for statement in &self.block.statements {
+            // todo: fix indentation
+            statement.fmt(f)?;
+        }
+        f.write_str("\n endwhile")
+    }
 }
 
 impl Parse for WhileStatement {
@@ -238,6 +317,7 @@ fn parse_specific_punctuation(
     }
 }
 
+#[derive(Arbitrary, Debug)]
 pub struct ForStatement {
     pub keyword_for: SpannedItem<Keyword>,
     pub variable_of_iteration: Ident,
@@ -248,6 +328,20 @@ pub struct ForStatement {
     pub keyword_do: SpannedItem<Keyword>,
     pub block: Block,
     pub keyword_endfor: SpannedItem<Keyword>,
+}
+
+impl Display for ForStatement {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str("for")?;
+        self.variable_of_iteration.fmt(f)?;
+        f.write_str("=")?;
+        self.start_expression.fmt(f)?;
+        f.write_str("to")?;
+        self.stop_expression.fmt(f)?;
+        f.write_str("do")?;
+        self.block.fmt(f)?;
+        f.write_str("\n endfor")
+    }
 }
 
 impl Parse for ForStatement {
@@ -274,11 +368,60 @@ impl Parse for ForStatement {
 
 type Ident = SpannedItem<String>;
 /// Parses expressions
+#[derive(Arbitrary, Debug)]
 pub enum Expression {
     Operator(SpannedItem<Operator>, Vec<Expression>),
     FunctionCall(Ident, Vec<Expression>),
     Ident(Ident),
     Literal(SpannedItem<crate::lexer::Literal>),
+}
+
+impl Display for Expression {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Operator(op, expressions) => {
+                match op.item {
+                    Operator::Times => {
+                        expressions.get(0).unwrap().fmt(f)?;
+                        f.write_str("*");
+                        expressions.get(1).unwrap().fmt(f)?;
+                    }
+                    Operator::Plus => {
+                        expressions.get(0).unwrap().fmt(f)?;
+                        f.write_str("+");
+                        expressions.get(1).unwrap().fmt(f)?;
+                    }
+                    Operator::Minus => {
+                        expressions.get(0).unwrap().fmt(f)?;
+                        f.write_str("-");
+                        expressions.get(1).unwrap().fmt(f)?;
+                    }
+                    Operator::Divide => {
+                        expressions.get(0).unwrap().fmt(f)?;
+                        f.write_str("/");
+                        expressions.get(1).unwrap().fmt(f)?;
+                    }
+                    _ => panic!("unsuported operator"),
+                }
+            }
+            Self::FunctionCall(ident, arguments) => {
+                ident.fmt(f)?;
+                f.write_str("(")?;
+                for argument in arguments {
+                    argument.fmt(f)?;
+                    f.write_str(", ")?;
+                }
+                f.write_str(")")?;
+            }
+            Self::Ident(ident) => {
+                ident.fmt(f)?;
+            }
+            Self::Literal(literal) => {
+                literal.item.fmt(f)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Parse for Expression {

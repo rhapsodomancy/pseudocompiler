@@ -1,9 +1,13 @@
 #[cfg(test)]
 mod test;
 
+use std::fmt::Display;
+
 use thiserror::Error as ThisError;
 
-#[derive(Debug, Clone, Eq, PartialEq, Copy)]
+use arbitrary::Arbitrary;
+
+#[derive(Debug, Clone, Eq, PartialEq, Copy, Arbitrary)]
 pub struct Loc {
     pub line: u32,
     pub col: u32,
@@ -15,7 +19,7 @@ impl Default for Loc {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Arbitrary)]
 pub struct Span {
     pub start: Loc,
     pub stop: Loc,
@@ -106,7 +110,7 @@ impl<'a> Lex<'a> for SpannedToken {
                     Ok(Self {
                         span: cursor.yield_span(start_loc),
                         token: Token::NewLine,
-                    }) 
+                    })
                 }
                 ' ' => {
                     let mut indents_count = 1;
@@ -201,14 +205,14 @@ impl<'a> Lex<'a> for SpannedToken {
                     Ok(Self {
                         span: cursor.yield_span(start_loc),
                         token: Token::Operator(Operator::Times),
-                    }) 
-                },
+                    })
+                }
                 '%' => {
                     cursor.eat_char();
                     Ok(Self {
                         span: cursor.yield_span(start_loc),
                         token: Token::Operator(Operator::Mod),
-                    }) 
+                    })
                 }
                 '-' => {
                     cursor.eat_char();
@@ -401,7 +405,7 @@ pub enum Token {
     Operator(Operator),
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Arbitrary)]
 pub enum Operator {
     And,
     Or,
@@ -421,14 +425,20 @@ pub enum Operator {
     Return,
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy)]
+impl Display for Operator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        todo!()
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Clone, Copy, Arbitrary)]
 pub enum Punctuation {
     OpenRoundBracket,
     CloseRoundBracket,
     Comma,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Arbitrary)]
 pub enum Keyword {
     If,
     ElseIf,
@@ -444,12 +454,32 @@ pub enum Keyword {
     EndFunction,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Arbitrary)]
 pub enum Literal {
     String(String),
     Boolean(bool),
     Integer(i32),
     Float(f32),
+}
+
+impl Display for Literal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::String(string) => {
+                f.write_str(&format!("\"{}\"", string))?;
+            }
+            Self::Boolean(x) => {
+                f.write_str(if *x {"true"} else {"false"})?;
+            }
+            Self::Integer(int) => {
+                int.fmt(f)?;
+            }
+            Self::Float(float) => {
+                float.fmt(f)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl Lex<'_> for Literal {

@@ -8,3 +8,5 @@ edition = "2018"
 
 [dependencies]
 thiserror="1"
+arbitrary = { version = "0.4", features = ["derive"] }
+libfuzzer-sys = "0.3.0"
