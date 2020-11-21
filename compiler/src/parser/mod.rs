@@ -333,7 +333,7 @@ impl Parse for WhileStatement {
             },
             keyword_do: {
                 let keyword = parse_specific_keyword(cursor, Keyword::Do)?;
-                parse_newline(cursor);
+                parse_newline(cursor)?;
                 keyword
             },
             block: Block::parse(cursor)?,
@@ -599,11 +599,10 @@ fn parse_expression(cursor: &mut ParseCursor, min_bp: u8) -> Result<Expression, 
                 result
             }
         }
-        Token::Literal(x) => {
-            Expression::Literal(SpannedItem {
+        Token::Literal(x) => Expression::Literal(SpannedItem {
             span: token.span,
             item: x,
-        })},
+        }),
         Token::Operator(Operator::OpenRoundBracket) => {
             let lhs = parse_expression(cursor, 0)?;
             assert_eq!(

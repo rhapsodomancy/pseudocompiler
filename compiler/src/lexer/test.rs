@@ -1,5 +1,3 @@
-use super::{Lex, LexCursor, SpannedToken};
-
 macro_rules! test_case {
     ($x:expr, $pass:expr) => {
         use super::lex;

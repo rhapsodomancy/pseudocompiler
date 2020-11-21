@@ -389,7 +389,7 @@ pub enum Operator {
 }
 
 impl Display for Operator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, _f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         todo!()
     }
 }
@@ -448,7 +448,7 @@ impl Lex<'_> for Literal {
         if let Some(character) = cursor.peek() {
             match character {
                 '"' => {
-                    let loc = cursor.loc;
+                    let _loc = cursor.loc;
                     cursor.eat_char();
                     let mut output = String::new();
                     while match cursor.peek() {
