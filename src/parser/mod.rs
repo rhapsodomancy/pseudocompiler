@@ -40,7 +40,7 @@ impl ParseCursor {
         }
     }
     pub fn is_empty(&self) -> bool {
-        self.input.len() > 0
+        self.input.len() == 0
     }
     pub fn next_where<F>(&mut self, f: F) -> Result<SpannedToken, ParseError>
     where
@@ -99,8 +99,10 @@ pub struct Statements(pub Vec<Statement>);
 
 impl Parse for Statements {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, ParseError> {
-        let statements = vec![];
-        while !cursor.is_empty() {}
+        let mut statements = vec![];
+        while !cursor.is_empty() {
+            statements.push(Statement::parse(cursor)?)
+        }
         Ok(Self(statements))
     }
 }
@@ -194,7 +196,7 @@ impl Parse for Block {
                 _ => 0,
             };
             if statement_indentation == indentation {
-                cursor.next_not_space()?;
+                cursor.next()?;
                 statements.push(Statement::parse(cursor)?);
             } else if statement_indentation + 2 == indentation
                 || statement_indentation + 4 == indentation
@@ -448,7 +450,9 @@ impl Parse for ForStatement {
         let stop_expression = Expression::parse(&mut ParseCursor::new(expression_tokens))?;
         let keyword_do = parse_specific_keyword(cursor, Keyword::Do)?;
         parse_newline(cursor)?;
+        println!("{:#?}", cursor.input);
         let block = Block::parse(cursor)?;
+        println!("{:#?}", cursor.input);
         let keyword_endfor = parse_specific_keyword(cursor, Keyword::EndFor)?;
         Ok(Self {
             keyword_for,
@@ -533,13 +537,7 @@ fn parse_expression(cursor: &mut ParseCursor, min_bp: u8) -> Result<Expression, 
     let mut lhs = match token.token {
         Token::Ident(x) => {
             // ok this is a bit messy, but it essentially parses function calls
-            if let Ok(next) = cursor.peek_where(|token| {
-                if let Token::Indentation(_) = token {
-                    false
-                } else {
-                    true
-                }
-            }) {
+            if let Ok(next) = cursor.peek_not_space() {
                 match next.token {
                     Token::Operator(crate::lexer::Operator::OpenRoundBracket) => {
                         cursor.next_not_space()?;
@@ -601,10 +599,11 @@ fn parse_expression(cursor: &mut ParseCursor, min_bp: u8) -> Result<Expression, 
                 result
             }
         }
-        Token::Literal(x) => Expression::Literal(SpannedItem {
+        Token::Literal(x) => {
+            Expression::Literal(SpannedItem {
             span: token.span,
             item: x,
-        }),
+        })},
         Token::Operator(Operator::OpenRoundBracket) => {
             let lhs = parse_expression(cursor, 0)?;
             assert_eq!(
