@@ -21,4 +21,6 @@ mod prolog;
 pub struct Solution {}
 
 /// The entry-point for solving a file.
-pub fn solve(input: Statements) -> Result<Solution, SolveError> {todo!()}
+pub fn solve(input: Statements) -> Result<Solution, SolveError> {
+    todo!()
+}

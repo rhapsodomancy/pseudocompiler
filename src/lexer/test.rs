@@ -2,34 +2,51 @@ use super::{Lex, LexCursor, SpannedToken};
 
 macro_rules! test_case {
     ($x:expr, $pass:expr) => {
-        let x = $x;
-        let mut cursor = LexCursor::new(x);
-        let mut spanned_tokens = vec![];
-        while cursor.input.len() > 0 {
-            spanned_tokens.push(SpannedToken::lex(&mut cursor));
-        }
-        if $pass {
-            for spanned_token in spanned_tokens {
-                match spanned_token {
-                    Ok(_) => {}
-                    Err(token) => panic!(
-                        "Expected this test to pass, but it failed! The output was: \n {:?}",
-                        token
-                    ),
+        use super::lex;
+        let lexed = lex($x.to_string());
+        match lexed {
+            Ok(output) => {
+                if !($pass) {
+                    panic!("Expected this test to fail but it passed. {:?}", output)
                 }
             }
-        } else {
-            for spanned_token in spanned_tokens {
-                match spanned_token {
-                    Ok(token) => panic!(
-                        "Expected this test to fail, but it passed! The output was: \n {:?}",
-                        token
-                    ),
-                    Err(_) => {}
+            Err(error) => {
+                if $pass {
+                    panic!("Expected this test to pass but it failed. {:?}", error);
                 }
             }
         }
     };
+}
+
+#[test]
+fn test_lex_string() {
+    test_case!(
+        r#"
+"hello world"
+"#,
+        true
+    );
+}
+
+#[test]
+fn test_lex_bool_true() {
+    test_case!(
+        r#"
+true
+"#,
+        true
+    );
+}
+
+#[test]
+fn test_lex_bool_false() {
+    test_case!(
+        r#"
+false
+"#,
+        true
+    );
 }
 
 #[test]
@@ -63,4 +80,9 @@ while x=="13" AND b=="16" AND (d * 8) == 32 do
 endwhile"#,
         true
     );
+}
+
+#[test]
+fn test_basic_expressions() {
+    test_case!(r#"12 * 8"#, true);
 }

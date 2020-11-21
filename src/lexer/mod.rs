@@ -56,7 +56,7 @@ impl<'a> LexCursor<'a> {
     pub fn eat_char(&mut self) -> Option<char> {
         let mut chars = self.input.chars();
         let next = chars.next();
-        self.input = chars.as_str();
+        self.input = self.input.get(1..).unwrap();
         next.map(|item| match item {
             '\n' => {
                 self.loc.line += 1;
@@ -102,7 +102,6 @@ pub struct SpannedToken {
 impl<'a> Lex<'a> for SpannedToken {
     fn lex(cursor: &'a mut LexCursor) -> Result<Self, LexError> {
         let start_loc = cursor.loc;
-        cursor.eat_while(|x| x == '\n');
         if let Some(item) = cursor.peek() {
             match item {
                 '\n' => {
@@ -118,11 +117,14 @@ impl<'a> Lex<'a> for SpannedToken {
                     loop {
                         if let Some(item) = cursor.peek() {
                             match item {
-                                ' ' => indents_count += 1,
+                                ' ' => {
+                                    cursor.eat_char();
+                                    indents_count += 1;
+                                }
                                 '\n' => {
                                     return Ok(Self {
                                         span: cursor.yield_span(start_loc),
-                                        token: Token::Punctuation(Punctuation::OpenRoundBracket),
+                                        token: Token::NewLine,
                                     });
                                 }
                                 _ => {
@@ -140,14 +142,14 @@ impl<'a> Lex<'a> for SpannedToken {
                     cursor.eat_char();
                     Ok(Self {
                         span: cursor.yield_span(start_loc),
-                        token: Token::Punctuation(Punctuation::OpenRoundBracket),
+                        token: Token::Operator(Operator::OpenRoundBracket),
                     })
                 }
                 ')' => {
                     cursor.eat_char();
                     Ok(Self {
                         span: cursor.yield_span(start_loc),
-                        token: Token::Punctuation(Punctuation::CloseRoundBracket),
+                        token: Token::Operator(Operator::CloseRoundBracket),
                     })
                 }
                 '[' => {
@@ -164,6 +166,13 @@ impl<'a> Lex<'a> for SpannedToken {
                         token: Token::Operator(Operator::CloseSquareBracket),
                     })
                 }
+                '/' => {
+                    cursor.eat_char();
+                    Ok(Self {
+                        span: cursor.yield_span(start_loc),
+                        token: Token::Operator(Operator::Divide),
+                    })
+                }
                 '=' => {
                     cursor.eat_char();
                     if let Some(next) = cursor.peek() {
@@ -174,12 +183,15 @@ impl<'a> Lex<'a> for SpannedToken {
                                 token: Token::Operator(Operator::EqualsEquals),
                             });
                         } else {
-                            panic!()
+                            return Ok(Self {
+                                span: cursor.yield_span(start_loc),
+                                token: Token::Operator(Operator::Equals),
+                            });
                         }
                     }
                     Ok(Self {
                         span: cursor.yield_span(start_loc),
-                        token: Token::Operator(Operator::Plus),
+                        token: Token::Operator(Operator::Equals),
                     })
                 }
                 '+' => {
@@ -229,7 +241,7 @@ impl<'a> Lex<'a> for SpannedToken {
                     }
                     Ok(Self {
                         span: cursor.yield_span(start_loc),
-                        token: Token::Operator(Operator::CloseSquareBracket),
+                        token: Token::Operator(Operator::Minus),
                     })
                 }
                 ',' => {
@@ -249,7 +261,7 @@ impl<'a> Lex<'a> for SpannedToken {
                 _ => {
                     let mut identifier = String::new();
                     while match cursor.peek() {
-                        Some(token) => token != ' ',
+                        Some(token) => token.is_alphanumeric(),
                         None => false,
                     } {
                         identifier.push(cursor.peek().unwrap());
@@ -257,131 +269,80 @@ impl<'a> Lex<'a> for SpannedToken {
                     }
                     match identifier.as_str() {
                         "AND" => {
-                            cursor.eat_n(3);
+                            println!("AND: {}", identifier);
                             Ok(Self {
                                 span: cursor.yield_span(start_loc),
                                 token: Token::Operator(Operator::And),
                             })
                         }
-                        "OR" => {
-                            cursor.eat_n(3);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Operator(Operator::Or),
-                            })
-                        }
-                        "NOT" => {
-                            cursor.eat_n(3);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Operator(Operator::Not),
-                            })
-                        }
-                        "for" => {
-                            cursor.eat_n(3);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::For),
-                            })
-                        }
-                        "function" => {
-                            cursor.eat_n(8);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::Function),
-                            })
-                        }
-                        "endfunction" => {
-                            cursor.eat_n(11);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::EndFunction),
-                            })
-                        }
-                        "return" => {
-                            cursor.eat_n(6);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Operator(Operator::Return),
-                            })
-                        }
-                        "to" => {
-                            cursor.eat_n(2);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::To),
-                            })
-                        }
-                        "do" => {
-                            cursor.eat_n(2);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::Do),
-                            })
-                        }
-                        "endfor" => {
-                            cursor.eat_n(6);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::EndFor),
-                            })
-                        }
-                        "while" => {
-                            cursor.eat_n(5);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::While),
-                            })
-                        }
-                        "endwhile" => {
-                            cursor.eat_n(7);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::EndWhile),
-                            })
-                        }
-                        "if" => {
-                            cursor.eat_n(2);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::If),
-                            })
-                        }
-                        "elseif" => {
-                            cursor.eat_n(5);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::ElseIf),
-                            })
-                        }
-                        "endif" => {
-                            cursor.eat_n(5);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::EndIf),
-                            })
-                        }
-                        "else" => {
-                            cursor.eat_n(4);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Keyword(Keyword::Else),
-                            })
-                        }
-                        "true" => {
-                            cursor.eat_n(4);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Literal(Literal::Boolean(true)),
-                            })
-                        }
-                        _ => {
-                            cursor.eat_n(identifier.len() as u32);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Ident(identifier),
-                            })
-                        }
+                        "OR" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Operator(Operator::Or),
+                        }),
+                        "NOT" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Operator(Operator::Not),
+                        }),
+                        "for" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::For),
+                        }),
+                        "function" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::Function),
+                        }),
+                        "endfunction" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::EndFunction),
+                        }),
+                        "return" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Operator(Operator::Return),
+                        }),
+                        "to" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::To),
+                        }),
+                        "do" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::Do),
+                        }),
+                        "endfor" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::EndFor),
+                        }),
+                        "while" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::While),
+                        }),
+                        "endwhile" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::EndWhile),
+                        }),
+                        "if" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::If),
+                        }),
+                        "elseif" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::ElseIf),
+                        }),
+                        "endif" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::EndIf),
+                        }),
+                        "else" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Keyword(Keyword::Else),
+                        }),
+                        "true" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Literal(Literal::Boolean(true)),
+                        }),
+                        _ => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Ident(identifier),
+                        }),
                     }
                 }
             }
@@ -423,6 +384,8 @@ pub enum Operator {
     Equals,
     EqualsEquals,
     Return,
+    OpenRoundBracket,
+    CloseRoundBracket,
 }
 
 impl Display for Operator {
@@ -433,8 +396,6 @@ impl Display for Operator {
 
 #[derive(Debug, Eq, PartialEq, Clone, Copy, Arbitrary)]
 pub enum Punctuation {
-    OpenRoundBracket,
-    CloseRoundBracket,
     Comma,
 }
 
@@ -469,7 +430,7 @@ impl Display for Literal {
                 f.write_str(&format!("\"{}\"", string))?;
             }
             Self::Boolean(x) => {
-                f.write_str(if *x {"true"} else {"false"})?;
+                f.write_str(if *x { "true" } else { "false" })?;
             }
             Self::Integer(int) => {
                 int.fmt(f)?;
@@ -488,13 +449,16 @@ impl Lex<'_> for Literal {
             match character {
                 '"' => {
                     let loc = cursor.loc;
+                    cursor.eat_char();
                     let mut output = String::new();
                     while match cursor.peek() {
                         Some(character) => character != '"',
-                        None => return Err(LexError::UnexpectedEndOfInput(cursor.yield_span(loc))),
+                        None => false,
                     } {
-                        output.push(cursor.eat_char().unwrap());
+                        let chars = cursor.eat_char().unwrap();
+                        output.push(chars);
                     }
+                    cursor.eat_char();
                     Ok(Self::String(output))
                 }
                 '0'..='9' => {
@@ -507,10 +471,8 @@ impl Lex<'_> for Literal {
                         output.push(cursor.eat_char().unwrap());
                     }
                     if output.parse::<i32>().is_ok() {
-                        cursor.eat_n(output.len() as u32);
                         Ok(Self::Integer(output.parse::<i32>().unwrap()))
                     } else if output.parse::<f32>().is_ok() {
-                        cursor.eat_n(output.len() as u32);
                         Ok(Self::Float(output.parse::<f32>().unwrap()))
                     } else {
                         Err(LexError::InvalidTokens(

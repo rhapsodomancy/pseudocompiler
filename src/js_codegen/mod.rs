@@ -40,6 +40,12 @@ impl OutputBuffer for Statement {
             Statement::ForStatement(item) => {
                 item.output(b);
             }
+            Statement::WhileStatement(item) => {
+                item.output(b);
+            }
+            Statement::Expression(exp) => {
+                exp.output(b);
+            }
         }
     }
 }
@@ -159,6 +165,7 @@ impl OutputBuffer for Expression {
                 crate::lexer::Operator::Return => {
                     write_unary_operator(b, arguments, "return");
                 }
+                _ => panic!("invalid"),
             },
             Expression::FunctionCall(function, arguments) => {
                 b.write(&function.item);
