@@ -78,6 +78,9 @@ impl OutputBuffer for WhileStatement {
 
 impl OutputBuffer for ForStatement {
     fn output(&self, b: &mut Buffer) {
+        b.write("var ");
+        b.write(&self.variable_of_iteration.item);
+        b.write(";");
         b.write("for (");
         b.write(&self.variable_of_iteration.item);
         b.write("=(");
@@ -86,12 +89,12 @@ impl OutputBuffer for ForStatement {
         b.write(&self.variable_of_iteration.item);
         b.write("<(");
         self.stop_expression.output(b);
-        b.write(")");
+        b.write(");");
         b.write(&format!("{}++", &self.variable_of_iteration.item));
         b.write(")");
         b.write("{");
         self.block.output(b);
-        b.write("}");
+        b.write("};");
     }
 }
 
