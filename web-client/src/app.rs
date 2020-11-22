@@ -37,7 +37,8 @@ impl Component for App {
             Self::Message::Compile => {
                 let input = self.text_model.get_value();
                 let input = compiler::compile(input);
-                let result = js_sys::eval(&input).unwrap();
+                yew::services::ConsoleService::log(&input);
+                let result = js_sys::JSON::stringify(&js_sys::eval(&input).unwrap()).unwrap();
                 self.result = if result.is_undefined() {
                     "This program didn't output anything".to_string()
                 } else {

@@ -28,9 +28,11 @@ pub trait OutputBuffer {
 
 impl OutputBuffer for Statements {
     fn output(&self, b: &mut Buffer) {
+        b.write(include_str!("../../../js_stdlib/lib.js"));
         for statement in &self.0 {
             statement.output(b);
         }
+        b.write("log");
     }
 }
 
@@ -178,7 +180,7 @@ impl OutputBuffer for Expression {
                     argument.output(b);
                     b.write(")");
                 }
-                b.write(")");
+                b.write(");");
             }
             Expression::Ident(identifier) => {
                 b.write(&identifier.item);
