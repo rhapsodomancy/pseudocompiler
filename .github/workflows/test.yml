@@ -5,25 +5,25 @@ jobs:
     name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: Swatinem/rust-cache@v1
+    steps:
       - name: Checkout repository
         uses: actions/checkout@v2
+      - uses: Swatinem/rust-cache@v1
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           override: true
-      - name: Run cargo-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
+      - name: Install tarpaulin
+        uses: actions-rs/install@v0.1
         with:
-          version: '0.15.0'
-          args: '-- --test-threads 1'
-      - name: Upload results
-        uses: codecov/codecov-action@v1.0.2
+          crate: cargo-tarpaulin
+          version: latest
+          use-tool-cache: true
+      - name: Calculate code coverage
+        run: cargo tarpaulin --all --all-features --timeout 600 --out Lcov -- --test-threads 1
+      - name: Upload coverage
+        uses: coverallsapp/github-action@master
         with:
-          file: cobertura.xml
-      - name: Archive code coverage results
-        uses: actions/upload-artifact@v1
-        with:
-          name: code-coverage-report
-          path: cobertura.xml
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./lcov.info
