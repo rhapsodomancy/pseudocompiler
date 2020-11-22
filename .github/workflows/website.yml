@@ -15,7 +15,7 @@ jobs:
           target: wasm32-unknown-unknown
           override: true
       - name: Install Trunk
-        run: cargo install trunk
+        run: cargo install trunk && cargo install wasm-bindgen-cli
       - name: Build playground
         run: cd playground && trunk build && cd ../
       - name: Deploy
