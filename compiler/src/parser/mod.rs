@@ -7,12 +7,16 @@ mod test;
 
 use std::fmt::{Display, Formatter};
 
+#[derive(Debug, Clone)]
 pub struct ParseCursor {
     input: Vec<SpannedToken>,
     loc: Loc,
 }
 
 impl ParseCursor {
+    pub fn len(&self) -> usize {
+        self.input.len()
+    }
     pub fn new(input: Vec<SpannedToken>) -> Self {
         Self {
             input,
@@ -38,6 +42,12 @@ impl ParseCursor {
         } else {
             Err(ParseError::UnexpectedEndOfInput(self.yield_span(self.loc)))
         }
+    }
+    pub fn peek_n(&self, n: usize) -> Result<&[SpannedToken], ParseError> {
+        self.input.get(0..n).map_or(
+            Err(ParseError::UnexpectedEndOfInput(self.yield_span(self.loc))),
+            |x| Ok(x),
+        )
     }
     pub fn is_empty(&self) -> bool {
         self.input.len() == 0
@@ -78,6 +88,20 @@ impl ParseCursor {
             }
         })
     }
+    pub fn eat_where<F>(&mut self, f: F)
+    where
+        F: Fn(&Token) -> bool,
+    {
+        while let Ok(i) = self.peek() {
+            if f(&i.token) {
+                if self.next().is_err() {
+                    return;
+                };
+            } else {
+                return;
+            }
+        }
+    }
 }
 
 #[derive(ThisError, Debug)]
@@ -94,8 +118,12 @@ pub trait Parse: Sized {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, ParseError>;
 }
 
-#[derive(Arbitrary, Debug)]
-pub struct Statements(pub Vec<Statement>);
+#[derive(Arbitrary, Clone, Debug)]
+pub struct Statements<IDENT = Ident, EXP = Expression<Ident>, PARAM = IDENT>(
+    pub Vec<Statement<IDENT, EXP, PARAM>>,
+)
+where
+    IDENT: Display;
 
 impl Parse for Statements {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, ParseError> {
@@ -117,11 +145,16 @@ impl Display for Statements {
     }
 }
 
-#[derive(Arbitrary, Debug)]
-pub enum Statement {
-    ForStatement(ForStatement),
-    WhileStatement(WhileStatement),
-    Expression(Expression),
+#[derive(Arbitrary, Clone, Debug)]
+pub enum Statement<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
+where
+    IDENT: Display,
+{
+    ForStatement(ForStatement<IDENT, EXP, PARAM>),
+    WhileStatement(WhileStatement<IDENT, EXP, PARAM>),
+    FunctionDefinition(FunctionDefinition<IDENT, EXP, PARAM>),
+    Expression(EXP),
+    AssignmentStatement(AssignmentStatement<IDENT, EXP>),
 }
 
 impl Display for Statement {
@@ -132,6 +165,8 @@ impl Display for Statement {
             }
             Self::WhileStatement(statement) => statement.fmt(f)?,
             Self::Expression(exp) => exp.fmt(f)?,
+            Self::AssignmentStatement(statement) => statement.fmt(f)?,
+            Self::FunctionDefinition(def) => def.fmt(f)?,
         }
         Ok(())
     }
@@ -139,14 +174,41 @@ impl Display for Statement {
 
 impl Parse for Statement {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, ParseError> {
+        cursor.eat_where(|token| token == &Token::NewLine);
         let next = cursor.peek()?;
         match next.token {
             Token::Keyword(keyword) => match keyword {
                 Keyword::For => Ok(Self::ForStatement(ForStatement::parse(cursor)?)),
                 Keyword::While => Ok(Self::WhileStatement(WhileStatement::parse(cursor)?)),
+                Keyword::Function => {
+                    Ok(Self::FunctionDefinition(FunctionDefinition::parse(cursor)?))
+                }
                 _ => panic!("Unsupported operation."),
             },
             _ => {
+                let (ident, possible_indentation) = if cursor.len() == 2 {
+                    if let [ident, possible_indentation] = cursor.peek_n(2)? {
+                        (ident, possible_indentation)
+                    } else {
+                        unreachable!()
+                    }
+                } else if let [ident, possible_indentation, equals] = cursor.peek_n(3)? {
+                    let equals = if let Token::Indentation(_) = possible_indentation.token {
+                        equals
+                    } else {
+                        possible_indentation
+                    };
+                    (ident, equals)
+                } else {
+                    unreachable!()
+                };
+                if let Token::Ident(_) = ident.token {
+                    if possible_indentation.token == Token::Assignment {
+                        return Ok(Self::AssignmentStatement(AssignmentStatement::parse(
+                            cursor,
+                        )?));
+                    }
+                }
                 let mut expression_tokens = vec![];
                 while match cursor.peek() {
                     Ok(peek) => peek.token != Token::NewLine,
@@ -166,15 +228,18 @@ impl Parse for Statement {
     }
 }
 
-#[derive(Arbitrary, Debug)]
-pub struct Block {
-    pub statements: Vec<Statement>,
+#[derive(Arbitrary, Clone, Debug)]
+pub struct Block<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
+where
+    IDENT: Display,
+{
+    pub statements: Statements<IDENT, EXP, PARAM>,
     pub indentation: u32,
 }
 
 impl Display for Block {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        for statement in &self.statements {
+        for statement in &self.statements.0 {
             statement.fmt(f)?;
         }
         Ok(())
@@ -205,19 +270,87 @@ impl Parse for Block {
             }
         }
         Ok(Self {
-            statements,
+            statements: Statements(statements),
             indentation,
         })
     }
 }
 
-#[derive(Arbitrary, Debug)]
+#[derive(Arbitrary, Clone, Debug)]
+pub struct AssignmentStatement<IDENT = Ident, EXP = Expression<Ident>>
+where
+    IDENT: Display,
+{
+    pub ident: IDENT,
+    pub equals_span: Span,
+    pub expression: EXP,
+}
+
+impl Display for AssignmentStatement {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.ident.fmt(f)?;
+        f.write_str(" = ")?;
+        self.expression.fmt(f)?;
+        f.write_str("\n")
+    }
+}
+
+impl Parse for AssignmentStatement {
+    fn parse(cursor: &mut ParseCursor) -> Result<Self, ParseError> {
+        Ok(Self {
+            ident: {
+                let next = cursor.next_not_space()?;
+                match next.token {
+                    Token::Ident(ident) => SpannedItem {
+                        item: ident,
+                        span: next.span,
+                    },
+                    _ => return Err(ParseError::UnexpectedToken(next)),
+                }
+            },
+            equals_span: {
+                let next = cursor.next_not_space()?;
+                match next.token {
+                    Token::Assignment => next.span,
+                    _ => return Err(ParseError::UnexpectedToken(next)),
+                }
+            },
+            expression: {
+                let mut expression_tokens = vec![];
+                while {
+                    cursor
+                        .peek()
+                        .map(|peek| match peek.token {
+                            Token::Ident(_) => true,
+                            Token::Operator(_) => true,
+                            Token::Indentation(_) => true,
+                            Token::Literal(_) => true,
+                            _ => false,
+                        })
+                        .unwrap_or(false)
+                } {
+                    expression_tokens.push(cursor.next()?)
+                }
+                let res = Expression::parse(&mut ParseCursor::new(expression_tokens))?;
+                res
+            },
+        })
+    }
+}
+
+#[derive(Arbitrary, Clone, Debug, Eq)]
 pub struct SpannedItem<T>
 where
     T: Arbitrary,
 {
     pub item: T,
     pub span: Span,
+}
+
+impl<T: PartialEq + Arbitrary> PartialEq for SpannedItem<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.item.eq(&other.item)
+    }
 }
 
 impl<T> SpannedItem<T>
@@ -238,12 +371,15 @@ where
     }
 }
 
-#[derive(Arbitrary, Debug)]
-pub struct FunctionDefinition {
+#[derive(Arbitrary, Clone, Debug)]
+pub struct FunctionDefinition<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
+where
+    IDENT: Display,
+{
     pub keyword_function: SpannedItem<Keyword>,
-    pub function_name: Ident,
-    pub arguments: Vec<Ident>,
-    pub block: Block,
+    pub function_name: IDENT,
+    pub parameters: Vec<PARAM>,
+    pub block: Block<IDENT, EXP, PARAM>,
     pub keyword_endfunction: SpannedItem<Keyword>,
 }
 
@@ -252,7 +388,7 @@ impl Display for FunctionDefinition {
         f.write_str("fuhction ")?;
         self.function_name.fmt(f)?;
         f.write_str("(")?;
-        for argument in &self.arguments {
+        for argument in &self.parameters {
             argument.fmt(f)?;
         }
         f.write_str(")")?;
@@ -274,7 +410,7 @@ impl Parse for FunctionDefinition {
                     _ => return Err(ParseError::UnexpectedToken(next)),
                 }
             },
-            arguments: {
+            parameters: {
                 let mut arguments = vec![];
                 loop {
                     if cursor.peek()?.token == Token::Operator(Operator::CloseRoundBracket) {
@@ -297,12 +433,15 @@ impl Parse for FunctionDefinition {
     }
 }
 
-#[derive(Arbitrary, Debug)]
-pub struct WhileStatement {
+#[derive(Arbitrary, Clone, Debug)]
+pub struct WhileStatement<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
+where
+    IDENT: Display,
+{
     pub keyword_while: SpannedItem<Keyword>,
-    pub condition: Expression,
+    pub condition: EXP,
     pub keyword_do: SpannedItem<Keyword>,
-    pub block: Block,
+    pub block: Block<IDENT, EXP, PARAM>,
     pub keyword_endwhile: SpannedItem<Keyword>,
 }
 
@@ -312,7 +451,7 @@ impl Display for WhileStatement {
         self.condition.fmt(f)?;
         f.write_str(" do")?;
         f.write_str("\n")?;
-        for statement in &self.block.statements {
+        for statement in &self.block.statements.0 {
             // todo: fix indentation
             statement.fmt(f)?;
         }
@@ -351,26 +490,10 @@ fn parse_specific_keyword(
         if keyword == comp_keyword {
             Ok(SpannedItem::new(keyword, next_token.span))
         } else {
-            return Err(ParseError::UnexpectedToken(next_token));
+            Err(ParseError::UnexpectedToken(next_token))
         }
     } else {
-        return Err(ParseError::UnexpectedToken(next_token));
-    }
-}
-
-fn parse_specific_operator(
-    cursor: &mut ParseCursor,
-    comp_operator: Operator,
-) -> Result<SpannedItem<Operator>, ParseError> {
-    let next_token = cursor.next()?;
-    if let Token::Operator(operator) = next_token.token {
-        if operator == comp_operator {
-            Ok(SpannedItem::new(operator, next_token.span))
-        } else {
-            return Err(ParseError::UnexpectedToken(next_token));
-        }
-    } else {
-        return Err(ParseError::UnexpectedToken(next_token));
+        Err(ParseError::UnexpectedToken(next_token))
     }
 }
 
@@ -383,23 +506,26 @@ fn parse_specific_punctuation(
         if punctuation == comp_punctuation {
             Ok(SpannedItem::new(punctuation, next_token.span))
         } else {
-            return Err(ParseError::UnexpectedToken(next_token));
+            Err(ParseError::UnexpectedToken(next_token))
         }
     } else {
-        return Err(ParseError::UnexpectedToken(next_token));
+        Err(ParseError::UnexpectedToken(next_token))
     }
 }
 
-#[derive(Arbitrary, Debug)]
-pub struct ForStatement {
+#[derive(Arbitrary, Clone, Debug)]
+pub struct ForStatement<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
+where
+    IDENT: Display,
+{
     pub keyword_for: SpannedItem<Keyword>,
-    pub variable_of_iteration: Ident,
-    pub equals_operator: SpannedItem<Operator>,
-    pub start_expression: Expression,
+    pub variable_of_iteration: IDENT,
+    pub equals_operator: Span,
+    pub start_expression: EXP,
     pub keyword_to: SpannedItem<Keyword>,
-    pub stop_expression: Expression,
+    pub stop_expression: EXP,
     pub keyword_do: SpannedItem<Keyword>,
-    pub block: Block,
+    pub block: Block<IDENT, EXP, PARAM>,
     pub keyword_endfor: SpannedItem<Keyword>,
 }
 
@@ -436,7 +562,14 @@ impl Parse for ForStatement {
                 _ => return Err(ParseError::UnexpectedToken(next)),
             }
         };
-        let equals_operator = parse_specific_operator(cursor, Operator::Equals)?;
+        let equals_operator = {
+            let next_token = cursor.next()?;
+            if let Token::Assignment = next_token.token {
+                next_token.span
+            } else {
+                return Err(ParseError::UnexpectedToken(next_token));
+            }
+        };
         let mut expression_tokens = vec![];
         while cursor.peek()?.token != Token::Keyword(Keyword::To) {
             expression_tokens.push(cursor.next()?);
@@ -450,9 +583,7 @@ impl Parse for ForStatement {
         let stop_expression = Expression::parse(&mut ParseCursor::new(expression_tokens))?;
         let keyword_do = parse_specific_keyword(cursor, Keyword::Do)?;
         parse_newline(cursor)?;
-        println!("{:#?}", cursor.input);
         let block = Block::parse(cursor)?;
-        println!("{:#?}", cursor.input);
         let keyword_endfor = parse_specific_keyword(cursor, Keyword::EndFor)?;
         Ok(Self {
             keyword_for,
@@ -468,17 +599,24 @@ impl Parse for ForStatement {
     }
 }
 
-type Ident = SpannedItem<String>;
+pub type Ident = SpannedItem<String>;
+
 /// Parses expressions
-#[derive(Arbitrary, Debug)]
-pub enum Expression {
-    Operator(SpannedItem<Operator>, Vec<Expression>),
-    FunctionCall(Ident, Vec<Expression>),
-    Ident(Ident),
+#[derive(Arbitrary, Clone, Debug, PartialEq)]
+pub enum Expression<IDENT = Ident>
+where
+    IDENT: Display,
+{
+    Operator(SpannedItem<Operator>, Vec<Self>),
+    FunctionCall(IDENT, Vec<Self>),
+    Ident(IDENT),
     Literal(SpannedItem<crate::lexer::Literal>),
 }
 
-impl Display for Expression {
+impl<IDENT> Display for Expression<IDENT>
+where
+    IDENT: Display,
+{
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Operator(op, expressions) => match op.item {
@@ -526,7 +664,9 @@ impl Display for Expression {
 
 impl Parse for Expression {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, ParseError> {
-        parse_expression(cursor, 0)
+        let res = parse_expression(cursor, 0);
+        if res.is_ok() {}
+        res
     }
 }
 
@@ -566,9 +706,7 @@ fn parse_expression(cursor: &mut ParseCursor, min_bp: u8) -> Result<Expression, 
                                 if should_be_comma.token
                                     != Token::Punctuation(crate::lexer::Punctuation::Comma)
                                 {
-                                    return Err(ParseError::UnexpectedToken(
-                                        should_be_comma.clone(),
-                                    ));
+                                    return Err(ParseError::UnexpectedToken(should_be_comma));
                                 }
                             }
                         }
@@ -605,10 +743,10 @@ fn parse_expression(cursor: &mut ParseCursor, min_bp: u8) -> Result<Expression, 
         }),
         Token::Operator(Operator::OpenRoundBracket) => {
             let lhs = parse_expression(cursor, 0)?;
-            assert_eq!(
-                cursor.next_not_space()?.token,
-                Token::Operator(Operator::CloseRoundBracket)
-            );
+            let next = cursor.next_not_space()?;
+            if next.token != Token::Operator(Operator::CloseRoundBracket) {
+                return Err(ParseError::UnexpectedToken(next));
+            }
             lhs
         }
         Token::Operator(op) => {
@@ -625,19 +763,13 @@ fn parse_expression(cursor: &mut ParseCursor, min_bp: u8) -> Result<Expression, 
         _ => panic!("bad token"),
     };
     loop {
-        let peek = match cursor.peek_where(|token| {
-            if let Token::Indentation(_) = token {
-                false
-            } else {
-                true
-            }
-        }) {
+        let peek = match cursor.peek_where(|token| !matches!(token, Token::Indentation(_))) {
             Ok(t) => t.clone(),
             Err(_) => break,
         };
         let op = match &peek.token {
             Token::Operator(op) => op,
-            _ => panic!(),
+            _ => return Err(ParseError::UnexpectedToken(peek)),
         };
         if let Some((l_bp, ())) = postfix_binding_power(&op) {
             if l_bp < min_bp {
@@ -708,12 +840,11 @@ fn postfix_binding_power(operator: &Operator) -> Option<(u8, ())> {
 
 fn infix_binding_power(op: &Operator) -> Option<(u8, u8)> {
     Some(match op {
-        Operator::Equals => (2, 1),
+        Operator::EqualsEquals => (2, 1),
         Operator::Plus | Operator::Minus => (5, 6),
         Operator::Times
         | Operator::Divide
         | Operator::IntegerDivide
-        | Operator::EqualsEquals
         | Operator::And
         | Operator::Or => (7, 8),
         _ => return None,

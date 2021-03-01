@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::lexer::lex;
 
-use super::{Expression, Parse, ParseCursor, Statement};
+use super::{AssignmentStatement, Expression, Parse, ParseCursor, Statement, Statements};
 
 fn test_parse<T>(input: &str, should_parse: bool)
 where
@@ -14,18 +14,22 @@ where
             println!("{:?}", result.unwrap_err());
             panic!("The input `{}` should have passed, but it failed.", input)
         }
-    } else {
-        if result.is_ok() {
-            println!("{:?}", result.unwrap_err());
-            panic!("The input `{}` should have failed, but it passed.", input)
-        }
+    } else if result.is_ok() {
+        println!("{:?}", result.unwrap_err());
+        panic!("The input `{}` should have failed, but it passed.", input)
     }
 }
 
 #[test]
+fn test_assignment() {
+    test_parse::<AssignmentStatement>("x = 5", true);
+    test_parse::<Statements>("x = 5 \ny = x \ny = \"15\"", true);
+}
+
+#[test]
 fn test_expressions() {
-    test_parse::<Expression>("(((12 + 8)))", true);
-    test_parse::<Expression>("1 + 2 + 3 + 4 + 5", true);
+    test_parse::<Expression>("((   (12 + 8))    )", true);
+    test_parse::<Expression>("1 + 2 + 3 +    4 + 5", true);
     test_parse::<Expression>("1 / (2 / 3)", true);
     test_parse::<Expression>("x", true);
     test_parse::<Expression>("1 / x", true);
@@ -33,6 +37,16 @@ fn test_expressions() {
     test_parse::<Expression>("x[0][1]", true);
     test_parse::<Expression>("print(\"12\")", true);
     test_parse::<Expression>("multiply(13, 14)", true);
+    test_parse::<Expression>("(1 * 13) + (35 / 10)", true);
+    test_parse::<Expression>("( 1   * 13 ) + ( 35 / 10 )", true);
+}
+
+#[test]
+fn test_expressions_fail() {
+    test_parse::<Expression>("(1 * 13) / (13", false);
+    test_parse::<Expression>("(1 * 13) + (35 / 10", false);
+    test_parse::<Expression>("(1 * 13 + (35 / 10)", false);
+    test_parse::<Expression>("(1 13) + (35 / 10 )", false);
 }
 
 #[test]

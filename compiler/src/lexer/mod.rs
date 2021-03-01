@@ -133,10 +133,10 @@ impl<'a> Lex<'a> for SpannedToken {
                             }
                         }
                     }
-                    return Ok(Self {
+                    Ok(Self {
                         span: cursor.yield_span(start_loc),
                         token: Token::Indentation(indents_count),
-                    });
+                    })
                 }
                 '(' => {
                     cursor.eat_char();
@@ -185,13 +185,13 @@ impl<'a> Lex<'a> for SpannedToken {
                         } else {
                             return Ok(Self {
                                 span: cursor.yield_span(start_loc),
-                                token: Token::Operator(Operator::Equals),
+                                token: Token::Assignment,
                             });
                         }
                     }
                     Ok(Self {
                         span: cursor.yield_span(start_loc),
-                        token: Token::Operator(Operator::Equals),
+                        token: Token::Assignment,
                     })
                 }
                 '+' => {
@@ -268,13 +268,10 @@ impl<'a> Lex<'a> for SpannedToken {
                         cursor.eat_char();
                     }
                     match identifier.as_str() {
-                        "AND" => {
-                            println!("AND: {}", identifier);
-                            Ok(Self {
-                                span: cursor.yield_span(start_loc),
-                                token: Token::Operator(Operator::And),
-                            })
-                        }
+                        "AND" => Ok(Self {
+                            span: cursor.yield_span(start_loc),
+                            token: Token::Operator(Operator::And),
+                        }),
                         "OR" => Ok(Self {
                             span: cursor.yield_span(start_loc),
                             token: Token::Operator(Operator::Or),
@@ -364,9 +361,11 @@ pub enum Token {
     NewLine,
     Ident(String),
     Operator(Operator),
+    /// Assignment is a statement, not an expression
+    Assignment,
 }
 
-#[derive(Debug, PartialEq, Clone, Copy, Arbitrary)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, Arbitrary)]
 pub enum Operator {
     And,
     Or,
@@ -381,7 +380,6 @@ pub enum Operator {
     Divide,
     IntegerDivide,
     Mod,
-    Equals,
     EqualsEquals,
     Return,
     OpenRoundBracket,
@@ -494,7 +492,7 @@ impl Lex<'_> for Literal {
 pub fn lex(input: String) -> Result<Vec<SpannedToken>, LexError> {
     let mut cursor = LexCursor::new(&input);
     let mut spanned_tokens = vec![];
-    while cursor.input.len() > 0 {
+    while !cursor.input.is_empty() {
         spanned_tokens.push(SpannedToken::lex(&mut cursor)?);
     }
     Ok(spanned_tokens)

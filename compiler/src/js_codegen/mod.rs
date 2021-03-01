@@ -48,6 +48,7 @@ impl OutputBuffer for Statement {
             Statement::Expression(exp) => {
                 exp.output(b);
             }
+            _ => panic!("unsupported operation"),
         }
     }
 }
@@ -57,7 +58,7 @@ impl OutputBuffer for FunctionDefinition {
         b.write("function ");
         b.write(&self.function_name.item);
         b.write("(");
-        for argument in &self.arguments {
+        for argument in &self.parameters {
             b.write(&argument.item);
             b.write(",");
         }
@@ -102,7 +103,7 @@ impl OutputBuffer for ForStatement {
 
 impl OutputBuffer for Block {
     fn output(&self, b: &mut Buffer) {
-        for statement in &self.statements {
+        for statement in &self.statements.0 {
             statement.output(b);
             b.write(";");
         }
@@ -163,7 +164,6 @@ impl OutputBuffer for Expression {
                 crate::lexer::Operator::Mod => {
                     write_binary_operator(b, arguments, "%");
                 }
-                crate::lexer::Operator::Equals => {}
                 crate::lexer::Operator::EqualsEquals => {
                     write_binary_operator(b, arguments, "==");
                 }
@@ -212,4 +212,20 @@ pub fn codegen(input: Statements) -> String {
     };
     Statements::output(&input, &mut buffer);
     buffer.output_string
+}
+
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_simple_for_loop_output() {}
+    #[test]
+    fn test_simple_while_loop_output() {}
+    #[test]
+    fn test_assignment_statement_output() {}
+    #[test]
+    fn test_single_clause_if() {}
+    #[test]
+    fn test_multiple_clause_if() {}
+    #[test]
+    fn test_function_definition() {}
 }
