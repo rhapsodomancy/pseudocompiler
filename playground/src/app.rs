@@ -1,11 +1,11 @@
-use monaco::{api::CodeEditorOptions, sys::editor::BuiltinTheme, yew::CodeEditor, api::TextModel};
+use monaco::{api::CodeEditorOptions, api::TextModel, sys::editor::BuiltinTheme, yew::CodeEditor};
 use std::rc::Rc;
 use yew::prelude::*;
 pub struct App {
     options: Rc<CodeEditorOptions>,
     result: String,
     link: ComponentLink<Self>,
-    text_model: TextModel
+    text_model: TextModel,
 }
 
 pub enum AppMsg {
@@ -28,7 +28,7 @@ impl Component for App {
             ),
             result: "".to_string(),
             link,
-            text_model: TextModel::create("", None, None).unwrap()
+            text_model: TextModel::create("", None, None).unwrap(),
         }
     }
 
@@ -36,6 +36,7 @@ impl Component for App {
         match msg {
             Self::Message::Compile => {
                 let input = self.text_model.get_value();
+                yew::services::ConsoleService::log(&input);
                 let input = compiler::compile(input);
                 yew::services::ConsoleService::log(&input);
                 let result = js_sys::JSON::stringify(&js_sys::eval(&input).unwrap()).unwrap();
