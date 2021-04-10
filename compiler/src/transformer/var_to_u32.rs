@@ -64,10 +64,23 @@ pub type VarFunctionDefinition = FunctionDefinition<Var, VarExpression, Var>;
 
 pub type VarAssignmentStatement = AssignmentStatement<Var, VarExpression>;
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct VarStatementsTransformer {
     counter: u32,
     ctx: HashMap<String, u32>,
+}
+
+impl Default for VarStatementsTransformer {
+    fn default() -> Self {
+        Self {
+            counter: 2,
+            ctx: {
+                let mut map = HashMap::new();
+                map.insert("print".to_string(), 0);
+                map
+            },
+        }
+    }
 }
 
 impl VarStatementsTransformer {

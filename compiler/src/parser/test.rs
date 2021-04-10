@@ -96,7 +96,18 @@ endwhile"#,
 
 #[test]
 fn test_function() {
-    test_parse::<Statement>(r#"function triple(number,)
+    test_parse::<Statement>(
+        r#"function triple(number,)
         return number*3
-    endfunction"#, true);
+    endfunction"#,
+        true,
+    );
+    test_parse::<Statement>(
+        r#"function x(y,)
+    return y + 5
+endfunction
+
+print(x(5))"#,
+        true,
+    )
 }
