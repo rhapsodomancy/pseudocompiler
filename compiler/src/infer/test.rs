@@ -36,8 +36,6 @@ fn test_valid_is_ok() {
 
 #[test]
 fn test_invalid_errors() {
-    let programs = ["y = 5 \ny = true"];
-    for program in programs.iter() {
-        expect_type_check_fail(program.to_string());
-    }
+    expect_type_check_fail("y = 5 \ny = true".into());
+    expect_type_check_fail("function x(y,)\n    x AND y\nendfunction x(5)".into());
 }
