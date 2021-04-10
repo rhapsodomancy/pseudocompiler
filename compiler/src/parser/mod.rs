@@ -401,7 +401,7 @@ impl Parse for FunctionDefinition {
         Ok(Self {
             keyword_function: parse_specific_keyword(cursor, Keyword::Function)?,
             function_name: {
-                let next = cursor.next()?;
+                let next = cursor.next_not_space()?;
                 match next.token {
                     Token::Ident(identifier) => Ident {
                         span: next.span,
@@ -411,12 +411,13 @@ impl Parse for FunctionDefinition {
                 }
             },
             parameters: {
+                parse_specific_operator(cursor, Operator::OpenRoundBracket)?;
                 let mut arguments = vec![];
                 loop {
                     if cursor.peek()?.token == Token::Operator(Operator::CloseRoundBracket) {
                         break;
                     }
-                    let next = cursor.next()?;
+                    let next = cursor.next_not_space()?;
                     match next.token {
                         Token::Ident(identifier) => {
                             arguments.push(SpannedItem::new(identifier, next.span))
@@ -425,11 +426,29 @@ impl Parse for FunctionDefinition {
                     }
                     parse_specific_punctuation(cursor, Punctuation::Comma)?;
                 }
+                parse_specific_operator(cursor, Operator::CloseRoundBracket)?;
+                parse_newline(cursor)?;
                 arguments
             },
             block: Block::parse(cursor)?,
             keyword_endfunction: parse_specific_keyword(cursor, Keyword::EndFunction)?,
         })
+    }
+}
+
+fn parse_specific_operator(
+    cursor: &mut ParseCursor,
+    comp_operator: Operator,
+) -> Result<SpannedItem<Operator>, ParseError> {
+    let next_token = cursor.next()?;
+    if let Token::Operator(operator) = next_token.token {
+        if operator == comp_operator {
+            Ok(SpannedItem::new(operator, next_token.span))
+        } else {
+            return Err(ParseError::UnexpectedToken(next_token));
+        }
+    } else {
+        return Err(ParseError::UnexpectedToken(next_token));
     }
 }
 
@@ -737,6 +756,26 @@ fn parse_expression(cursor: &mut ParseCursor, min_bp: u8) -> Result<Expression, 
                 result
             }
         }
+        Token::Operator(Operator::Return) => {
+            let rhs = parse_expression(cursor, min_bp)?;
+            Expression::Operator(
+                SpannedItem {
+                    span: token.span,
+                    item: Operator::Return,
+                },
+                vec![rhs],
+            )
+        }
+        Token::Operator(Operator::Not) => {
+            let rhs = parse_expression(cursor, min_bp)?;
+            Expression::Operator(
+                SpannedItem {
+                    span: token.span,
+                    item: Operator::Not,
+                },
+                vec![rhs],
+            )
+        }
         Token::Literal(x) => Expression::Literal(SpannedItem {
             span: token.span,
             item: x,
@@ -825,7 +864,9 @@ fn parse_expression(cursor: &mut ParseCursor, min_bp: u8) -> Result<Expression, 
 fn prefix_binding_power(operator: &Operator) -> ((), u8) {
     match operator {
         Operator::Plus | Operator::Minus => ((), 9),
-        _ => panic!(),
+        _ => {
+            panic!()
+        }
     }
 }
 

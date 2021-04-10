@@ -11,9 +11,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.3"
-
-[dependencies.pseudocompiler]
-path = ".."
+compiler = { path = "../../compiler" }
 
 # Prevent this from interfering with workspaces
 [workspace]

@@ -39,6 +39,8 @@ fn test_expressions() {
     test_parse::<Expression>("multiply(13, 14)", true);
     test_parse::<Expression>("(1 * 13) + (35 / 10)", true);
     test_parse::<Expression>("( 1   * 13 ) + ( 35 / 10 )", true);
+    test_parse::<Expression>("NOT true", true);
+    test_parse::<Expression>("return false", true);
 }
 
 #[test]
@@ -90,4 +92,11 @@ endwhile"#,
         endwhile"#,
         true,
     );
+}
+
+#[test]
+fn test_function() {
+    test_parse::<Statement>(r#"function triple(number,)
+        return number*3
+    endfunction"#, true);
 }

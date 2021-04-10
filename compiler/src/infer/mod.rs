@@ -152,6 +152,7 @@ impl ConstraintGatherer {
         Ok(())
     }
     fn walk_expr(&mut self, expr: VarExpression) -> Result<(), TypeInferenceError> {
+        dbg!(&expr);
         match expr.1.clone() {
             crate::transformer::var_to_u32::VarExpressionItem::Operator(op, args) => {
                 let (ty, arity) = match op.item {
@@ -178,6 +179,7 @@ impl ConstraintGatherer {
                 self.insert_or_merge(expr.0, vec![VarConstraint::EqNonBuiltin(fn_name.id)]);
                 for (arg, exp) in exprs.into_iter().zip(args) {
                     self.insert_or_merge(arg.0, vec![VarConstraint::EqNonBuiltin(exp.clone().id)]);
+                    self.walk_expr(arg)?;
                 }
             }
             crate::transformer::var_to_u32::VarExpressionItem::Ident(ident) => {
@@ -185,6 +187,7 @@ impl ConstraintGatherer {
                 self.insert_or_merge(ident.id, constraints);
             }
             crate::transformer::var_to_u32::VarExpressionItem::Literal(lit) => {
+                dbg!(&lit);
                 self.insert_or_merge(
                     expr.0,
                     vec![VarConstraint::EqBuiltin(match lit.item {
