@@ -3,8 +3,8 @@ use std::collections::{HashMap, HashSet};
 use either::Either;
 
 use crate::{
-    lexer::{Literal, Operator},
-    parser::{Expression, SpannedItem, Statement},
+    lexer::{Literal, Loc, Operator, Span},
+    parser::{Expression, Ident, SpannedItem, Statement},
     transformer::var_to_u32::{
         Var, VarAssignmentStatement, VarBlock, VarExpression, VarFormStatement,
         VarFunctionDefinition, VarStatement, VarStatements, VarWhileStatement,
@@ -18,13 +18,37 @@ pub struct TyVar(u32);
 
 pub struct VarVar(u32);
 
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+#[derive(Hash, Eq, PartialOrd, Ord, Debug, Clone)]
 pub enum Ty {
     Bool,
     Float,
     String,
     Integer,
     Any,
+}
+
+impl PartialEq for Ty {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Ty::Bool, Ty::Bool) => true,
+            (Ty::Bool, Ty::Float) => false,
+            (Ty::Bool, Ty::String) => false,
+            (Ty::Bool, Ty::Integer) => false,
+            (_, Ty::Any) | (Ty::Any, _) => true,
+            (Ty::Float, Ty::Bool) => false,
+            (Ty::Float, Ty::Float) => true,
+            (Ty::Float, Ty::String) => false,
+            (Ty::Float, Ty::Integer) => false,
+            (Ty::String, Ty::Bool) => false,
+            (Ty::String, Ty::Float) => false,
+            (Ty::String, Ty::String) => true,
+            (Ty::String, Ty::Integer) => false,
+            (Ty::Integer, Ty::Bool) => false,
+            (Ty::Integer, Ty::Float) => false,
+            (Ty::Integer, Ty::String) => false,
+            (Ty::Integer, Ty::Integer) => true,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -35,7 +59,7 @@ pub enum VarConstraint {
     EqNonBuiltin(u32),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ConstraintGatherer {
     /// maps variables to constraints
     ctx: HashMap<u32, Vec<VarConstraint>>,
@@ -43,6 +67,46 @@ pub struct ConstraintGatherer {
     ///                 ^^^ look up constraints in constraints table
     functions: HashMap<Var, Vec<Var>>,
     counter: u32,
+}
+
+impl Default for ConstraintGatherer {
+    fn default() -> Self {
+        Self {
+            ctx: {
+                let mut map = HashMap::new();
+                map.insert(0, vec![VarConstraint::EqBuiltin(Ty::Any)]);
+                map.insert(1, vec![VarConstraint::EqBuiltin(Ty::Any)]);
+                map
+            },
+            functions: {
+                let mut map = HashMap::new();
+                map.insert(
+                    Var {
+                        id: 0,
+                        ident: Ident {
+                            item: "print".to_string(),
+                            span: Span {
+                                start: Loc { line: 0, col: 0 },
+                                stop: Loc { line: 0, col: 0 },
+                            },
+                        },
+                    },
+                    vec![Var {
+                        id: 1,
+                        ident: Ident {
+                            item: "x".to_string(),
+                            span: Span {
+                                start: Loc { line: 0, col: 0 },
+                                stop: Loc { line: 0, col: 0 },
+                            },
+                        },
+                    }],
+                );
+                map
+            },
+            counter: 2,
+        }
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -56,6 +120,8 @@ pub enum TypeInferenceError {
     BadType(SpannedItem<Operator>, Expression<Var>, Ty, Ty),
     #[error("cannot unify")]
     Mismatch(TyConstraint, TyConstraint),
+    #[error("variable defined before use")]
+    VariableDefinedBeforeUse(Var),
 }
 
 impl ConstraintGatherer {
@@ -152,7 +218,6 @@ impl ConstraintGatherer {
         Ok(())
     }
     fn walk_expr(&mut self, expr: VarExpression) -> Result<(), TypeInferenceError> {
-        dbg!(&expr);
         match expr.1.clone() {
             crate::transformer::var_to_u32::VarExpressionItem::Operator(op, args) => {
                 let (ty, arity) = match op.item {
@@ -183,7 +248,10 @@ impl ConstraintGatherer {
                 }
             }
             crate::transformer::var_to_u32::VarExpressionItem::Ident(ident) => {
-                let constraints = self.ctx.get(&expr.0).map(Clone::clone).unwrap_or_default();
+                let constraints = match self.ctx.get(&expr.0).map(Clone::clone) {
+                    Some(t) => t,
+                    None => return Err(TypeInferenceError::VariableDefinedBeforeUse(ident)),
+                };
                 self.insert_or_merge(ident.id, constraints);
             }
             crate::transformer::var_to_u32::VarExpressionItem::Literal(lit) => {
@@ -219,7 +287,7 @@ impl ConstraintGatherer {
     }
 }
 
-#[derive(Hash, PartialEq, Eq, PartialOrd, Ord, Debug, Clone)]
+#[derive(Hash, Eq, PartialEq, PartialOrd, Ord, Debug, Clone)]
 pub enum TyConstraint {
     BuiltIn(Ty),
     Var(u32),

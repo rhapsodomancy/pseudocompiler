@@ -110,7 +110,7 @@ pub enum ParseError {
     UnexpectedEndOfInput(Span),
     #[error("Unexpected token")]
     UnexpectedToken(SpannedToken),
-    #[error("")]
+    #[error("expected indentation")]
     ExpectedIndentation(SpannedToken),
 }
 
