@@ -1,5 +1,4 @@
 use crate::lexer::{Keyword, Loc, Operator, Punctuation, Span, SpannedToken, Token};
-use arbitrary::Arbitrary;
 use thiserror::Error as ThisError;
 
 #[cfg(test)]
@@ -118,7 +117,7 @@ pub trait Parse: Sized {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, ParseError>;
 }
 
-#[derive(Arbitrary, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Statements<IDENT = Ident, EXP = Expression<Ident>, PARAM = IDENT>(
     pub Vec<Statement<IDENT, EXP, PARAM>>,
 )
@@ -145,7 +144,7 @@ impl Display for Statements {
     }
 }
 
-#[derive(Arbitrary, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum Statement<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
 where
     IDENT: Display,
@@ -228,7 +227,7 @@ impl Parse for Statement {
     }
 }
 
-#[derive(Arbitrary, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct Block<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
 where
     IDENT: Display,
@@ -276,7 +275,7 @@ impl Parse for Block {
     }
 }
 
-#[derive(Arbitrary, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct AssignmentStatement<IDENT = Ident, EXP = Expression<Ident>>
 where
     IDENT: Display,
@@ -338,25 +337,19 @@ impl Parse for AssignmentStatement {
     }
 }
 
-#[derive(Arbitrary, Clone, Debug, Eq)]
-pub struct SpannedItem<T>
-where
-    T: Arbitrary,
-{
+#[derive(Clone, Debug, Eq)]
+pub struct SpannedItem<T> {
     pub item: T,
     pub span: Span,
 }
 
-impl<T: PartialEq + Arbitrary> PartialEq for SpannedItem<T> {
+impl<T: PartialEq> PartialEq for SpannedItem<T> {
     fn eq(&self, other: &Self) -> bool {
         self.item.eq(&other.item)
     }
 }
 
-impl<T> SpannedItem<T>
-where
-    T: Arbitrary,
-{
+impl<T> SpannedItem<T> {
     fn new(item: T, span: Span) -> Self {
         Self { item, span }
     }
@@ -364,14 +357,14 @@ where
 
 impl<T> Display for SpannedItem<T>
 where
-    T: Display + Arbitrary,
+    T: Display,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.item.fmt(f)
     }
 }
 
-#[derive(Arbitrary, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct FunctionDefinition<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
 where
     IDENT: Display,
@@ -452,7 +445,7 @@ fn parse_specific_operator(
     }
 }
 
-#[derive(Arbitrary, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct WhileStatement<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
 where
     IDENT: Display,
@@ -532,7 +525,7 @@ fn parse_specific_punctuation(
     }
 }
 
-#[derive(Arbitrary, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub struct ForStatement<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
 where
     IDENT: Display,
@@ -621,7 +614,7 @@ impl Parse for ForStatement {
 pub type Ident = SpannedItem<String>;
 
 /// Parses expressions
-#[derive(Arbitrary, Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expression<IDENT = Ident>
 where
     IDENT: Display,

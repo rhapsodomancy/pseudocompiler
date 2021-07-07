@@ -8,5 +8,4 @@ edition = "2018"
 
 [dependencies]
 thiserror= "1.0.26"
-arbitrary = { version = "1.0.1", features = ["derive"] }
 either = "1.6.1"

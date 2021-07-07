@@ -1,6 +1,7 @@
 use monaco::{api::CodeEditorOptions, api::TextModel, sys::editor::BuiltinTheme, yew::CodeEditor};
 use std::rc::Rc;
 use yew::prelude::*;
+
 pub struct App {
     options: Rc<CodeEditorOptions>,
     result: String,

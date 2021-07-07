@@ -5,9 +5,7 @@ use std::fmt::Display;
 
 use thiserror::Error as ThisError;
 
-use arbitrary::Arbitrary;
-
-#[derive(Debug, Clone, Eq, PartialEq, Copy, Arbitrary)]
+#[derive(Debug, Clone, Eq, PartialEq, Copy)]
 pub struct Loc {
     pub line: u32,
     pub col: u32,
@@ -19,7 +17,7 @@ impl Default for Loc {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Arbitrary)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub struct Span {
     pub start: Loc,
     pub stop: Loc,
@@ -365,7 +363,7 @@ pub enum Token {
     Assignment,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, Arbitrary)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Operator {
     And,
     Or,
@@ -392,12 +390,12 @@ impl Display for Operator {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Copy, Arbitrary)]
+#[derive(Debug, Eq, PartialEq, Clone, Copy)]
 pub enum Punctuation {
     Comma,
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone, Arbitrary)]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Keyword {
     If,
     ElseIf,
@@ -413,7 +411,7 @@ pub enum Keyword {
     EndFunction,
 }
 
-#[derive(Debug, PartialEq, Clone, Arbitrary)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Literal {
     String(String),
     Boolean(bool),
