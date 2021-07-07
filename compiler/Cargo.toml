@@ -7,6 +7,6 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-thiserror="1"
-arbitrary = { version = "0.4", features = ["derive"] }
+thiserror= "1.0.26"
+arbitrary = { version = "1.0.1", features = ["derive"] }
 either = "1.6.1"
