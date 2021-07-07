@@ -1,6 +1,6 @@
 use crate::{
     lexer,
-    parser::{Parse, ParseCursor, Statements},
+    parser::{Parse, ParseCursor, Ast},
     transformer::{var_to_u32::VarStatementsTransformer, Transformer},
 };
 
@@ -8,7 +8,7 @@ use super::ty_infer;
 
 fn expect_type_check_pass(input: String) {
     let tokens = lexer::lex(input).unwrap();
-    let parsed = Statements::parse(&mut ParseCursor::new(tokens)).unwrap();
+    let parsed = Ast::parse(&mut ParseCursor::new(tokens)).unwrap();
     let transformed = VarStatementsTransformer::default().transform(parsed);
     let res = ty_infer(transformed);
     if let Err(e) = res {
@@ -18,7 +18,7 @@ fn expect_type_check_pass(input: String) {
 
 fn expect_type_check_fail(input: String) {
     let tokens = lexer::lex(input).unwrap();
-    let parsed = Statements::parse(&mut ParseCursor::new(tokens)).unwrap();
+    let parsed = Ast::parse(&mut ParseCursor::new(tokens)).unwrap();
     let transformed = VarStatementsTransformer::default().transform(parsed);
     let res = ty_infer(transformed);
     if let Ok(t) = res {

@@ -6,7 +6,7 @@ use crate::{
     lexer::Operator,
     parser::{
         AssignmentStatement, Block, Expression, ForStatement, FunctionDefinition, Ident,
-        SpannedItem, Statement, Statements, WhileStatement,
+        SpannedItem, Statement, Ast, WhileStatement,
     },
 };
 
@@ -36,7 +36,7 @@ impl Display for Var {
     }
 }
 
-pub type VarStatements = Statements<Var, VarExpression>;
+pub type VarStatements = Ast<Var, VarExpression>;
 
 pub type VarStatement = Statement<Var, VarExpression>;
 
@@ -89,12 +89,12 @@ impl VarStatementsTransformer {
         self.counter += 1;
         r
     }
-    fn walk_statements(&mut self, stmt: Statements) -> VarStatements {
+    fn walk_statements(&mut self, stmt: Ast) -> VarStatements {
         let mut output = vec![];
         for statement in stmt.0 {
             output.push(self.walk_statement(statement))
         }
-        Statements(output)
+        Ast(output)
     }
     fn walk_statement(&mut self, stmt: Statement) -> VarStatement {
         match stmt {
@@ -248,8 +248,8 @@ impl VarStatementsTransformer {
     }
 }
 
-impl Transformer<Statements, VarStatements> for VarStatementsTransformer {
-    fn transform(&mut self, from: Statements) -> VarStatements {
+impl Transformer<Ast, VarStatements> for VarStatementsTransformer {
+    fn transform(&mut self, from: Ast) -> VarStatements {
         self.walk_statements(from)
     }
 }

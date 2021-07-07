@@ -118,13 +118,13 @@ pub trait Parse: Sized {
 }
 
 #[derive(Clone, Debug)]
-pub struct Statements<IDENT = Ident, EXP = Expression<Ident>, PARAM = IDENT>(
+pub struct Ast<IDENT = Ident, EXP = Expression<Ident>, PARAM = IDENT>(
     pub Vec<Statement<IDENT, EXP, PARAM>>,
 )
 where
     IDENT: Display;
 
-impl Parse for Statements {
+impl Parse for Ast {
     fn parse(cursor: &mut ParseCursor) -> Result<Self, ParseError> {
         let mut statements = vec![];
         while !cursor.is_empty() {
@@ -134,7 +134,7 @@ impl Parse for Statements {
     }
 }
 
-impl Display for Statements {
+impl Display for Ast {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for statement in &self.0 {
             statement.fmt(f)?;
@@ -232,7 +232,7 @@ pub struct Block<IDENT = Ident, EXP = Expression<IDENT>, PARAM = IDENT>
 where
     IDENT: Display,
 {
-    pub statements: Statements<IDENT, EXP, PARAM>,
+    pub statements: Ast<IDENT, EXP, PARAM>,
     pub indentation: u32,
 }
 
@@ -269,7 +269,7 @@ impl Parse for Block {
             }
         }
         Ok(Self {
-            statements: Statements(statements),
+            statements: Ast(statements),
             indentation,
         })
     }

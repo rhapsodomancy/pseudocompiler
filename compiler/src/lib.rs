@@ -11,7 +11,7 @@ pub mod utils;
 
 pub fn compile(input: String) -> String {
     let tokens = lexer::lex(input).unwrap();
-    let parsed = parser::Statements::parse(&mut parser::ParseCursor::new(tokens)).unwrap();
+    let parsed = parser::Ast::parse(&mut parser::ParseCursor::new(tokens)).unwrap();
     let transformed = VarStatementsTransformer::default().transform(parsed.clone());
     if ty_infer(transformed).is_err() {
         panic!("type error");

@@ -1,5 +1,5 @@
 use crate::parser::{
-    Block, Expression, ForStatement, FunctionDefinition, Statement, Statements, WhileStatement,
+    Block, Expression, ForStatement, FunctionDefinition, Statement, Ast, WhileStatement,
 };
 
 use thiserror::Error as ThisError;
@@ -26,7 +26,7 @@ pub trait OutputBuffer {
     fn output(&self, b: &mut Buffer);
 }
 
-impl OutputBuffer for Statements {
+impl OutputBuffer for Ast {
     fn output(&self, b: &mut Buffer) {
         b.write(include_str!("../../../js_stdlib/lib.js"));
         for statement in &self.0 {
@@ -206,11 +206,11 @@ impl OutputBuffer for Expression {
     }
 }
 
-pub fn codegen(input: Statements) -> String {
+pub fn codegen(input: Ast) -> String {
     let mut buffer = Buffer {
         output_string: "".to_string(),
     };
-    Statements::output(&input, &mut buffer);
+    Ast::output(&input, &mut buffer);
     buffer.output_string
 }
 

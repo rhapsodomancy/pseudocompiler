@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 use crate::lexer::lex;
 
-use super::{AssignmentStatement, Expression, Parse, ParseCursor, Statement, Statements};
+use super::{AssignmentStatement, Expression, Parse, ParseCursor, Statement, Ast};
 
 fn test_parse<T>(input: &str, should_parse: bool)
 where
@@ -23,7 +23,7 @@ where
 #[test]
 fn test_assignment() {
     test_parse::<AssignmentStatement>("x = 5", true);
-    test_parse::<Statements>("x = 5 \ny = x \ny = \"15\"", true);
+    test_parse::<Ast>("x = 5 \ny = x \ny = \"15\"", true);
 }
 
 #[test]
